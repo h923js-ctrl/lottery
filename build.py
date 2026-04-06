@@ -40,23 +40,22 @@ def build_lottery_data(code: str) -> dict:
         return None
 
     pool_min, pool_max = config["main_range"]
-    period = min(100, len(draws))
-    recent = draws[-period:]
 
-    # 统计分析
-    hot = hot_numbers(recent, pool_min, pool_max, top_n=10)
-    cold = cold_numbers(recent, pool_min, pool_max, top_n=10)
-    overdue = overdue_numbers(recent, pool_min, pool_max)
-    freq = number_frequency(recent, pool_min, pool_max)
-    sum_stats = sum_statistics(recent)
+    # 用全部数据做统计分析（1500+期）
+    hot = hot_numbers(draws, pool_min, pool_max, top_n=10)
+    cold = cold_numbers(draws, pool_min, pool_max, top_n=10)
+    overdue = overdue_numbers(draws, pool_min, pool_max)
+    freq = number_frequency(draws, pool_min, pool_max)
+    sum_stats = sum_statistics(draws)
 
     patterns = {}
     if code != "qxc":
-        patterns = most_common_patterns(recent, pool_max)
+        patterns = most_common_patterns(draws, pool_max)
 
-    # 最近50期历史
+    # 最近200期历史（供前端浏览）
+    hist_count = min(200, len(draws))
     history = []
-    for d in draws[-50:]:
+    for d in draws[-hist_count:]:
         history.append({
             "period": d.period,
             "date": d.date,
@@ -76,7 +75,7 @@ def build_lottery_data(code: str) -> dict:
         "bonus_range": list(config["bonus_range"]) if config.get("bonus_range") else None,
         "bonus_count": config.get("bonus_count", 0),
         "total": len(draws),
-        "period": period,
+        "period": len(draws),
         "history": history,
         "stats": {
             "hot": [{"number": n, "count": c} for n, c in hot],
