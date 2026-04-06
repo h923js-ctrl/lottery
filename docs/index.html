@@ -233,6 +233,7 @@ body {
       <div class="quick-btns">
         <div class="quick-btn" onclick="quickAction('fushi','clear')">清空</div>
         <div class="quick-btn" onclick="quickAction('fushi','random')">机选</div>
+        <div class="quick-btn" onclick="quickAction('fushi','smart')">🤖 AI推荐</div>
         <div class="quick-btn" onclick="quickAction('fushi','hot')">选热号</div>
         <div class="quick-btn" onclick="quickAction('fushi','cold')">选冷号</div>
       </div>
@@ -251,6 +252,7 @@ body {
       <div class="quick-btns">
         <div class="quick-btn" onclick="quickAction('dantuo','clear')">清空</div>
         <div class="quick-btn" onclick="quickAction('dantuo','random')">机选</div>
+        <div class="quick-btn" onclick="quickAction('dantuo','smart')">🤖 AI推荐</div>
       </div>
       <div class="bet-count" id="dantuoBetCount"></div>
     </div>
@@ -726,9 +728,44 @@ async function quickAction(panel, action) {
     }
     return;
   }
-  // 选热号/冷号
   const data = await loadJSON(c.code);
   if (!data) return;
+
+  // AI 推荐：综合统计+玄学评分，选出最佳号码
+  if (action === 'smart') {
+    const scores = computeSmartScores(data, c);
+    const ranked = Object.entries(scores).sort((a,b) => b[1] - a[1]).map(e => +e[0]);
+
+    if (panel === 'fushi') {
+      // 复式：选评分最高的 mCount+2~3 个主号 + bCount 个附号
+      const extra = Math.floor(Math.random()*2) + 2; // 多选2~3个
+      playState.fushi.main = ranked.filter(n => n>=c.mMin && n<=c.mMax).slice(0, c.mCount + extra);
+      if (c.bCount > 0) {
+        const bScores = computeSmartScores(data, c, true);
+        const bRanked = Object.entries(bScores).sort((a,b) => b[1]-a[1]).map(e => +e[0]);
+        playState.fushi.bonus = bRanked.filter(n => n>=c.bMin && n<=c.bMax).slice(0, c.bCount + 1);
+      }
+      renderFushiPanel(c);
+      toast('🤖 AI已推荐复式号码');
+    }
+    if (panel === 'dantuo') {
+      // 胆拖：评分最高的1~2个为胆码，接下来的为拖码
+      const mainPool = ranked.filter(n => n>=c.mMin && n<=c.mMax);
+      const danCount = Math.floor(Math.random()*2) + 1; // 1~2个胆码
+      playState.dantuo.dan = mainPool.slice(0, danCount);
+      playState.dantuo.tuo = mainPool.slice(danCount, danCount + c.mCount + 1);
+      if (c.bCount > 0) {
+        const bScores = computeSmartScores(data, c, true);
+        const bRanked = Object.entries(bScores).sort((a,b) => b[1]-a[1]).map(e => +e[0]);
+        playState.dantuo.bonus = bRanked.filter(n => n>=c.bMin && n<=c.bMax).slice(0, c.bCount);
+      }
+      renderDantuoPanel(c);
+      toast('🤖 AI已推荐胆拖号码');
+    }
+    return;
+  }
+
+  // 选热号/冷号
   if (action === 'hot' && panel === 'fushi') {
     playState.fushi.main = data.stats.hot.slice(0,c.mCount+2).map(h=>h.number);
     if (c.bCount>0) playState.fushi.bonus = randomSample(c.bMin,c.bMax,c.bCount);
@@ -739,6 +776,54 @@ async function quickAction(panel, action) {
     if (c.bCount>0) playState.fushi.bonus = randomSample(c.bMin,c.bMax,c.bCount);
     renderFushiPanel(c);
   }
+}
+
+// ===== AI 综合评分 =====
+function computeSmartScores(data, cfg, isBonus) {
+  const scores = {};
+  const freq = data.stats.frequency;
+  const maxF = Math.max(...freq.map(f => f.count));
+  const [pMin, pMax] = isBonus && cfg.bMin !== undefined ? [cfg.bMin, cfg.bMax] : [cfg.mMin, cfg.mMax];
+
+  // 1. 频率分 (30%)
+  freq.forEach(f => {
+    if (f.number >= pMin && f.number <= pMax) {
+      scores[f.number] = (scores[f.number]||0) + (f.count / maxF) * 0.3;
+    }
+  });
+
+  // 2. 遗漏分 - 超期号码加分 (25%)
+  if (data.stats.overdue) {
+    data.stats.overdue.forEach(o => {
+      if (o.number >= pMin && o.number <= pMax) {
+        scores[o.number] = (scores[o.number]||0) + Math.min(o.overdue_ratio * 0.1, 0.25);
+      }
+    });
+  }
+
+  // 3. 玄学分 (25%) - 五行 + 风水
+  const d = new Date();
+  const base = new Date(2000, 0, 7);
+  const days = Math.floor((d - base) / 86400000);
+  const tgIdx = ((days % 10) + 10) % 10;
+  const wuxingNums = [[3,8],[3,8],[2,7],[2,7],[5,0],[5,0],[4,9],[4,9],[1,6],[1,6]];
+  const luckyTails = wuxingNums[tgIdx];
+  const fengGood = [6,8,9]; const fengBad = [4];
+
+  for (let n = pMin; n <= pMax; n++) {
+    if (!scores[n]) scores[n] = 0.15; // 基础分
+    const tail = n % 10;
+    if (luckyTails.includes(tail)) scores[n] += 0.15;
+    if (fengGood.includes(tail)) scores[n] += 0.05;
+    if (fengBad.includes(tail)) scores[n] -= 0.05;
+  }
+
+  // 4. 随机扰动 (20%) - 避免每次结果一样
+  for (let n = pMin; n <= pMax; n++) {
+    scores[n] = (scores[n]||0.1) + Math.random() * 0.2;
+  }
+
+  return scores;
 }
 
 function randomSample(min, max, count) {
