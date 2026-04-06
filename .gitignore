@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+lottery/data/__pycache__/
+lottery/stats/__pycache__/
+lottery/xuanxue/__pycache__/
+lottery/engine/__pycache__/
+lottery/display/__pycache__/

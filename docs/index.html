@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<title>彩票智能选号</title>
+<style>
+:root {
+  --primary: #e74c3c;
+  --primary-dark: #c0392b;
+  --blue: #3498db;
+  --blue-dark: #2980b9;
+  --gold: #f39c12;
+  --green: #27ae60;
+  --purple: #9b59b6;
+  --bg: #f5f6fa;
+  --card: #ffffff;
+  --text: #2d3436;
+  --text-light: #636e72;
+  --border: #dfe6e9;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --radius: 16px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px;
+  -webkit-tap-highlight-color: transparent;
+}
+.header {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white; padding: 20px 16px 16px; text-align: center; position: sticky; top: 0; z-index: 100;
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header .sub { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+.tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; background: var(--card);
+  display: flex; border-top: 1px solid var(--border); z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-item {
+  flex: 1; text-align: center; padding: 8px 0 6px; font-size: 10px;
+  color: var(--text-light); cursor: pointer; transition: color 0.2s; user-select: none;
+}
+.tab-item.active { color: var(--primary); }
+.tab-item .icon { font-size: 22px; display: block; margin-bottom: 2px; }
+.page { display: none; padding: 16px; }
+.page.active { display: block; }
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.card-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.ball-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.ball {
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0;
+}
+.ball.red { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.ball.blue { background: linear-gradient(135deg, #3498db, #2980b9); }
+.ball.yellow { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.ball.purple { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.ball.green { background: linear-gradient(135deg, #27ae60, #229954); }
+.ball.sm { width: 30px; height: 30px; font-size: 12px; }
+.ball-divider { color: var(--text-light); font-size: 18px; margin: 0 2px; }
+.pick-row { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.pick-row:last-child { border-bottom: none; }
+.pick-label { font-size: 13px; color: var(--text-light); width: 36px; flex-shrink: 0; }
+.pick-score { font-size: 12px; color: var(--gold); margin-left: auto; flex-shrink: 0; }
+.selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.sel-btn {
+  padding: 8px 16px; border: 2px solid var(--border); border-radius: 24px; font-size: 13px;
+  background: var(--card); color: var(--text); cursor: pointer; transition: all 0.2s;
+  flex: 1; text-align: center; min-width: 70px; user-select: none;
+}
+.sel-btn.active { border-color: var(--primary); background: var(--primary); color: white; }
+.action-btn {
+  width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px;
+  font-weight: 600; color: white; cursor: pointer; transition: transform 0.1s, opacity 0.2s; user-select: none;
+}
+.action-btn:active { transform: scale(0.97); }
+.action-btn.primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+.action-btn.blue { background: linear-gradient(135deg, var(--blue), var(--blue-dark)); }
+.action-btn:disabled { opacity: 0.5; }
+.stat-bar-row { display: flex; align-items: center; margin: 4px 0; font-size: 12px; }
+.stat-bar-label { width: 28px; text-align: right; margin-right: 8px; font-weight: 600; }
+.stat-bar-wrap { flex: 1; height: 18px; background: #eee; border-radius: 9px; overflow: hidden; }
+.stat-bar-fill { height: 100%; border-radius: 9px; transition: width 0.5s ease; min-width: 2px; }
+.stat-bar-fill.hot { background: linear-gradient(90deg, #e74c3c, #ff6b6b); }
+.stat-bar-fill.cold { background: linear-gradient(90deg, #3498db, #74b9ff); }
+.stat-bar-fill.normal { background: linear-gradient(90deg, #27ae60, #55efc4); }
+.stat-bar-count { width: 32px; text-align: right; margin-left: 6px; color: var(--text-light); }
+.xuan-card {
+  background: var(--card); border-radius: var(--radius); padding: 16px;
+  margin-bottom: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--gold);
+}
+.xuan-card .icon-big { font-size: 28px; }
+.xuan-card .title { font-size: 15px; font-weight: 600; margin: 6px 0; }
+.xuan-card .desc { font-size: 13px; color: var(--text-light); line-height: 1.6; }
+.xuan-card .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+.tag.green { background: #e8f5e9; color: #2e7d32; }
+.tag.red { background: #ffebee; color: #c62828; }
+.tag.gold { background: #fff8e1; color: #f57f17; }
+.history-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.history-item:last-child { border-bottom: none; }
+.history-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light); margin-bottom: 6px; }
+.pattern-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+.pattern-label { color: var(--text-light); }
+.pattern-value { font-weight: 600; }
+.loading { text-align: center; padding: 40px; color: var(--text-light); }
+.loading .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+.overdue-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.overdue-item:last-child { border-bottom: none; }
+.overdue-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: white; }
+.overdue-badge.high { background: var(--primary); }
+.overdue-badge.medium { background: var(--gold); }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+.empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; margin-bottom: 16px; }
+.data-date { text-align: center; font-size: 11px; color: var(--text-light); padding: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎰 彩票智能选号</h1>
+  <div class="sub" id="headerDate"></div>
+</div>
+<div id="toast" class="toast"></div>
+
+<!-- 选号页 -->
+<div id="page-pick" class="page active">
+  <div class="card">
+    <div class="card-title">🎯 选择彩票</div>
+    <div class="selector" id="lotterySelector">
+      <div class="sel-btn active" data-type="ssq">🔴 双色球</div>
+      <div class="sel-btn" data-type="dlt">🏆 大乐透</div>
+      <div class="sel-btn" data-type="qxc">⭐ 七星彩</div>
+      <div class="sel-btn" data-type="kl8">🎱 快乐8</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🎲 选择模式</div>
+    <div class="selector" id="modeSelector">
+      <div class="sel-btn active" data-mode="balanced">平衡</div>
+      <div class="sel-btn" data-mode="stats">统计</div>
+      <div class="sel-btn" data-mode="xuanxue">玄学</div>
+      <div class="sel-btn" data-mode="random">随机</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">📊 生成注数</div>
+    <div class="selector" id="countSelector">
+      <div class="sel-btn" data-count="3">3注</div>
+      <div class="sel-btn active" data-count="5">5注</div>
+      <div class="sel-btn" data-count="8">8注</div>
+      <div class="sel-btn" data-count="10">10注</div>
+    </div>
+  </div>
+  <button class="action-btn primary" id="btnPick" onclick="doPick()">✨ 开始选号</button>
+  <div id="pickResult" style="margin-top:16px"></div>
+</div>
+
+<!-- 分析页 -->
+<div id="page-stats" class="page">
+  <div class="card">
+    <div class="card-title">📊 选择彩票</div>
+    <div class="selector" id="statsSelector">
+      <div class="sel-btn active" data-type="ssq">🔴 双色球</div>
+      <div class="sel-btn" data-type="dlt">🏆 大乐透</div>
+      <div class="sel-btn" data-type="qxc">⭐ 七星彩</div>
+      <div class="sel-btn" data-type="kl8">🎱 快乐8</div>
+    </div>
+  </div>
+  <button class="action-btn blue" onclick="loadStats()">查看分析</button>
+  <div id="statsResult" style="margin-top:16px"></div>
+</div>
+
+<!-- 玄学页 -->
+<div id="page-xuanxue" class="page">
+  <div id="xuanxueResult"><div class="loading"><div class="spinner"></div><p style="margin-top:12px">加载中...</p></div></div>
+</div>
+
+<!-- 开奖页 -->
+<div id="page-history" class="page">
+  <div class="card">
+    <div class="card-title">📋 选择彩票</div>
+    <div class="selector" id="histSelector">
+      <div class="sel-btn active" data-type="ssq">🔴 双色球</div>
+      <div class="sel-btn" data-type="dlt">🏆 大乐透</div>
+      <div class="sel-btn" data-type="qxc">⭐ 七星彩</div>
+      <div class="sel-btn" data-type="kl8">🎱 快乐8</div>
+    </div>
+  </div>
+  <button class="action-btn blue" onclick="loadHistory()">查看开奖</button>
+  <div id="historyResult" style="margin-top:16px"></div>
+</div>
+
+<!-- 关于页 -->
+<div id="page-about" class="page">
+  <div class="card">
+    <div class="card-title">ℹ️ 关于</div>
+    <p style="font-size:13px; color:var(--text-light); line-height:1.8">
+      彩票智能选号工具 v2.0<br>
+      基于历史数据统计分析 + 中国传统玄学辅助<br>
+      支持: 双色球 / 大乐透 / 七星彩 / 快乐8<br>
+      数据每日自动更新<br><br>
+      ⚠️ 本工具仅供娱乐，号码基于统计和随机生成，不构成任何投注建议。理性购彩，量力而行。
+    </p>
+  </div>
+  <div id="dataInfo" class="card"></div>
+</div>
+
+<div class="tab-bar">
+  <div class="tab-item active" onclick="switchTab('pick')"><span class="icon">🎯</span>选号</div>
+  <div class="tab-item" onclick="switchTab('stats')"><span class="icon">📊</span>分析</div>
+  <div class="tab-item" onclick="switchTab('xuanxue')"><span class="icon">🔮</span>玄学</div>
+  <div class="tab-item" onclick="switchTab('history')"><span class="icon">📋</span>开奖</div>
+  <div class="tab-item" onclick="switchTab('about')"><span class="icon">ℹ️</span>关于</div>
+</div>
+
+<script>
+// ===== 数据缓存 =====
+const dataCache = {};
+const TABS = ['pick','stats','xuanxue','history','about'];
+
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded', () => {
+  const d = new Date();
+  document.getElementById('headerDate').textContent =
+    `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  setupSelectors();
+  preloadData();
+});
+
+function setupSelectors() {
+  document.querySelectorAll('.selector').forEach(sel => {
+    sel.addEventListener('click', e => {
+      const btn = e.target.closest('.sel-btn');
+      if (!btn) return;
+      sel.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+}
+
+async function preloadData() {
+  // 预加载双色球数据
+  await loadJSON('ssq');
+}
+
+// ===== 数据加载 =====
+async function loadJSON(code) {
+  if (dataCache[code]) return dataCache[code];
+  try {
+    const resp = await fetch(`data/${code}.json`);
+    if (!resp.ok) throw new Error('加载失败');
+    dataCache[code] = await resp.json();
+    return dataCache[code];
+  } catch (e) {
+    toast('数据加载失败');
+    return null;
+  }
+}
+
+async function loadXuanxueData() {
+  if (dataCache._xuanxue) return dataCache._xuanxue;
+  try {
+    const resp = await fetch('data/xuanxue.json');
+    dataCache._xuanxue = await resp.json();
+    return dataCache._xuanxue;
+  } catch (e) {
+    // 回退到 JS 计算
+    return computeXuanxue();
+  }
+}
+
+// ===== 工具函数 =====
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.tab-item')[TABS.indexOf(name)].classList.add('active');
+  if (name === 'xuanxue') loadXuanxue();
+  if (name === 'about') loadAbout();
+}
+
+function getSelected(selId, attr) {
+  const el = document.querySelector(`#${selId} .sel-btn.active`);
+  return el ? el.dataset[attr] : null;
+}
+
+function ballHtml(num, type='red', size='') {
+  const display = type === 'yellow' ? num : String(num).padStart(2,'0');
+  return `<div class="ball ${type} ${size}">${display}</div>`;
+}
+
+function renderBalls(code, main, bonus) {
+  let h = '<div class="ball-row">';
+  if (code === 'ssq' || code === 'dlt') {
+    h += main.map(n => ballHtml(n,'red')).join('');
+    h += '<span class="ball-divider">|</span>';
+    h += (bonus||[]).map(n => ballHtml(n,'blue')).join('');
+  } else if (code === 'qxc') {
+    h += main.map(n => ballHtml(n,'yellow')).join('');
+  } else {
+    h += main.map(n => ballHtml(n,'purple','sm')).join('');
+  }
+  return h + '</div>';
+}
+
+function scoreStars(s) {
+  const n = Math.min(Math.round(s * 10), 5);
+  return `<span style="color:var(--gold)">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span>`;
+}
+
+// ===== 选号引擎 (JS 版) =====
+function weightedSample(scores, count) {
+  const nums = Object.keys(scores).map(Number);
+  const weights = nums.map(n => Math.max(scores[n], 0.001));
+  const selected = [];
+  const remaining = [...nums];
+  const remainWeights = [...weights];
+
+  for (let i = 0; i < count && remaining.length > 0; i++) {
+    const total = remainWeights.reduce((a,b) => a+b, 0);
+    let r = Math.random() * total;
+    let idx = 0;
+    for (; idx < remainWeights.length - 1; idx++) {
+      r -= remainWeights[idx];
+      if (r <= 0) break;
+    }
+    selected.push(remaining[idx]);
+    remaining.splice(idx, 1);
+    remainWeights.splice(idx, 1);
+  }
+  return selected.sort((a,b) => a-b);
+}
+
+function computeStatScores(data) {
+  if (!data || !data.stats) return {};
+  const freq = data.stats.frequency;
+  const maxF = Math.max(...freq.map(f => f.count));
+  const scores = {};
+  freq.forEach(f => {
+    scores[f.number] = (f.count / maxF) * 0.5 + Math.random() * 0.5;
+  });
+
+  // 遗漏加分
+  if (data.stats.overdue) {
+    data.stats.overdue.forEach(o => {
+      if (scores[o.number] !== undefined) {
+        scores[o.number] += o.overdue_ratio * 0.1;
+      }
+    });
+  }
+  return scores;
+}
+
+function computeXuanxueScores(poolMax) {
+  // 简化版五行 + 风水计算
+  const d = new Date();
+  const base = new Date(2000, 0, 7); // 甲子日
+  const days = Math.floor((d - base) / 86400000);
+  const tgIdx = ((days % 10) + 10) % 10;
+  // 天干五行: 甲乙木(3,8) 丙丁火(2,7) 戊己土(5,0) 庚辛金(4,9) 壬癸水(1,6)
+  const wuxingNums = [[3,8],[3,8],[2,7],[2,7],[5,0],[5,0],[4,9],[4,9],[1,6],[1,6]];
+  const lucky = wuxingNums[tgIdx];
+  // 风水吉数
+  const fengshui = {6: 0.15, 8: 0.15, 9: 0.1, 3: 0.05};
+  const fengBad = {4: -0.1};
+
+  const scores = {};
+  for (let n = 1; n <= poolMax; n++) {
+    let s = 1.0;
+    const tail = n % 10;
+    if (lucky.includes(tail)) s += 0.3;
+    if (fengshui[tail]) s += fengshui[tail];
+    if (fengBad[tail]) s += fengBad[tail];
+    scores[n] = s;
+  }
+  return scores;
+}
+
+function checkConstraints(nums, poolMax) {
+  if (!nums || nums.length === 0) return false;
+  const odd = nums.filter(n => n % 2 === 1).length;
+  if (odd === 0 || odd === nums.length) return false;
+  // 连号检查
+  const sorted = [...nums].sort((a,b) => a-b);
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === sorted[i-1] + 1) { run++; if (run > 3) return false; }
+    else run = 1;
+  }
+  return true;
+}
+
+async function doPick() {
+  const btn = document.getElementById('btnPick');
+  btn.disabled = true; btn.textContent = '🎲 生成中...';
+
+  const code = getSelected('lotterySelector', 'type') || 'ssq';
+  const mode = getSelected('modeSelector', 'mode') || 'balanced';
+  const count = parseInt(getSelected('countSelector', 'count') || '5');
+
+  const data = await loadJSON(code);
+  btn.disabled = false; btn.textContent = '✨ 开始选号';
+
+  if (!data) return;
+
+  const modeNames = {balanced:'平衡模式', stats:'统计模式', xuanxue:'玄学模式', random:'随机模式'};
+  const picks = [];
+
+  for (let i = 0; i < count; i++) {
+    let mainScores = {};
+    const [pMin, pMax] = data.main_range;
+
+    if (mode === 'random') {
+      for (let n = pMin; n <= pMax; n++) mainScores[n] = Math.random();
+    } else {
+      const statS = computeStatScores(data);
+      const xuanS = computeXuanxueScores(pMax);
+      const sw = mode === 'stats' ? 1.0 : mode === 'xuanxue' ? 0.3 : 0.6;
+      const xw = mode === 'stats' ? 0.0 : mode === 'xuanxue' ? 0.7 : 0.4;
+      for (let n = pMin; n <= pMax; n++) {
+        mainScores[n] = (statS[n] || 0.5) * sw + (xuanS[n] || 1.0) * xw + Math.random() * 0.15;
+      }
+    }
+
+    let main;
+    if (code === 'qxc') {
+      // 七星彩: 7个位置独立选
+      const ranges = [[0,9],[0,9],[0,9],[0,9],[0,9],[0,9],[0,14]];
+      main = ranges.map(([lo,hi]) => {
+        const s = {};
+        for (let n = lo; n <= hi; n++) s[n] = (mainScores[n] || 1) + Math.random();
+        return weightedSample(s, 1)[0];
+      });
+    } else {
+      for (let attempt = 0; attempt < 50; attempt++) {
+        main = weightedSample(mainScores, data.main_count);
+        if (checkConstraints(main, pMax)) break;
+      }
+    }
+
+    let bonus = [];
+    if (data.bonus_range && data.bonus_count > 0) {
+      const [bMin, bMax] = data.bonus_range;
+      const bs = {};
+      for (let n = bMin; n <= bMax; n++) bs[n] = Math.random() + 0.5;
+      bonus = weightedSample(bs, data.bonus_count);
+    }
+
+    const avgScore = Object.values(mainScores).reduce((a,b) => a+b, 0) / Object.keys(mainScores).length;
+    const pickScore = main.reduce((a, n) => a + (mainScores[n]||0), 0) / main.length / (avgScore || 1);
+    picks.push({ main, bonus, score: Math.min(pickScore, 1) });
+  }
+
+  // 渲染结果
+  let html = `<div class="card">
+    <div class="card-title">🎯 ${data.name} 推荐号码</div>
+    <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">
+      ${modeNames[mode]} | ${data.total}期数据 | ${new Date().toISOString().slice(0,10)}
+    </div>`;
+  picks.forEach((p, i) => {
+    html += `<div class="pick-row">
+      <span class="pick-label">第${i+1}注</span>
+      ${renderBalls(code, p.main, p.bonus)}
+      <span class="pick-score">${scoreStars(p.score)}</span>
+    </div>`;
+  });
+  html += '</div><div style="text-align:center;font-size:12px;color:var(--text-light);padding:8px">⚠️ 仅供娱乐，不构成投注建议</div>';
+  document.getElementById('pickResult').innerHTML = html;
+}
+
+// ===== 统计分析 =====
+async function loadStats() {
+  const code = getSelected('statsSelector', 'type') || 'ssq';
+  const container = document.getElementById('statsResult');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const data = await loadJSON(code);
+  if (!data) { container.innerHTML = ''; return; }
+
+  const s = data.stats;
+  let html = '';
+
+  // 冷热号
+  html += `<div class="card"><div class="card-title">🔥 热号 & ❄️ 冷号</div>`;
+  html += '<div style="margin-bottom:8px"><b style="font-size:12px">热号:</b></div>';
+  html += '<div class="ball-row">' + s.hot.map(h => ballHtml(h.number,'red','sm')).join('') + '</div>';
+  html += '<div style="margin:8px 0"><b style="font-size:12px">冷号:</b></div>';
+  html += '<div class="ball-row">' + s.cold.map(c => ballHtml(c.number,'blue','sm')).join('') + '</div></div>';
+
+  // 频率
+  const maxF = Math.max(...s.frequency.map(f => f.count));
+  const topF = [...s.frequency].sort((a,b) => b.count - a.count).slice(0,15);
+  html += `<div class="card"><div class="card-title">📊 号码频率 (最近${data.period}期)</div>`;
+  topF.forEach(f => {
+    const pct = (f.count/maxF*100).toFixed(0);
+    const cls = f.count > maxF*0.7 ? 'hot' : f.count < maxF*0.3 ? 'cold' : 'normal';
+    html += `<div class="stat-bar-row"><span class="stat-bar-label">${String(f.number).padStart(2,'0')}</span>
+      <div class="stat-bar-wrap"><div class="stat-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <span class="stat-bar-count">${f.count}</span></div>`;
+  });
+  html += '</div>';
+
+  // 遗漏
+  if (s.overdue && s.overdue.length) {
+    html += `<div class="card"><div class="card-title">⏰ 超期号码</div>`;
+    s.overdue.forEach(o => {
+      const badge = o.overdue_ratio > 2 ? 'high' : 'medium';
+      html += `<div class="overdue-item"><span>${ballHtml(o.number, badge==='high'?'red':'yellow','sm')}</span>
+        <span style="font-size:12px">遗漏 ${o.current_gap} 期 (平均 ${o.avg_gap.toFixed(0)})</span>
+        <span class="overdue-badge ${badge}">${o.overdue_ratio}x</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  // 模式
+  if (s.patterns && s.patterns.odd_even) {
+    html += `<div class="card"><div class="card-title">🔢 模式分析</div>`;
+    html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px">奇偶比</div>';
+    Object.entries(s.patterns.odd_even).slice(0,5).forEach(([k,v]) => {
+      html += `<div class="pattern-row"><span class="pattern-label">${k}</span><span class="pattern-value">${v}%</span></div>`;
+    });
+    html += '<div style="font-size:12px;color:var(--text-light);margin:8px 0 6px">大小比</div>';
+    Object.entries(s.patterns.high_low).slice(0,5).forEach(([k,v]) => {
+      html += `<div class="pattern-row"><span class="pattern-label">${k}</span><span class="pattern-value">${v}%</span></div>`;
+    });
+    if (s.patterns.consecutive) {
+      html += `<div style="margin-top:8px"><div class="pattern-row"><span class="pattern-label">连号出现率</span><span class="pattern-value" style="color:var(--gold)">${s.patterns.consecutive.consecutive_rate}%</span></div></div>`;
+    }
+    html += '</div>';
+  }
+
+  // 和值
+  if (s.sum_stats && s.sum_stats.mean) {
+    const ss = s.sum_stats;
+    html += `<div class="card"><div class="card-title">📐 和值分析</div>
+      <div class="pattern-row"><span class="pattern-label">平均和值</span><span class="pattern-value">${ss.mean}</span></div>
+      <div class="pattern-row"><span class="pattern-label">和值范围</span><span class="pattern-value">${ss.min} ~ ${ss.max}</span></div>
+      <div class="pattern-row"><span class="pattern-label">推荐范围</span><span class="pattern-value" style="color:var(--green)">${ss.q1} ~ ${ss.q3}</span></div>
+      <div class="pattern-row"><span class="pattern-label">最近10期</span><span class="pattern-value">${ss.recent_10_avg}</span></div></div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+// ===== 玄学 =====
+let xuanLoaded = false;
+async function loadXuanxue() {
+  if (xuanLoaded) return;
+  const data = await loadXuanxueData();
+  if (!data) return;
+  xuanLoaded = true;
+
+  const modules = [
+    { icon:'☯️', title:'五行分析', color:'#f39c12',
+      content:`<div style="font-size:24px;font-weight:700;margin:8px 0">${data.wuxing.ganzhi} · ${data.wuxing.element}</div>
+        <div class="desc">${data.wuxing.desc}</div>
+        <div class="tags">${data.wuxing.lucky_tails.map(n=>`<span class="tag green">吉 ${n}</span>`).join('')}
+        ${data.wuxing.sheng_tails.map(n=>`<span class="tag gold">生 ${n}</span>`).join('')}
+        ${data.wuxing.avoid_tails.map(n=>`<span class="tag red">避 ${n}</span>`).join('')}</div>`},
+    { icon:'🐉', title:'生肖分析', color:'#e74c3c',
+      content:`<div style="font-size:24px;font-weight:700;margin:8px 0">${data.shengxiao.year} ${data.shengxiao.animal}年</div>
+        <div class="desc">${data.shengxiao.desc}</div>
+        <div class="tags">${data.shengxiao.lucky_numbers.map(n=>`<span class="tag green">吉 ${n}</span>`).join('')}
+        <span class="tag gold">六合 ${data.shengxiao.liuhe}</span>
+        <span class="tag red">冲 ${data.shengxiao.chong}</span></div>`},
+    { icon:'☰', title:'八卦数理', color:'#9b59b6',
+      content:`<div style="font-size:20px;font-weight:700;margin:8px 0">${data.bagua.name}</div>
+        <div class="desc">${data.bagua.desc}</div>
+        <div class="desc">${data.bagua.upper_desc}<br>${data.bagua.lower_desc}</div>
+        <div class="tags" style="margin-top:8px">${data.bagua.lucky_numbers.map(n=>`<span class="tag green">${n}</span>`).join('')}</div>`},
+    { icon:'🌙', title:'农历日期', color:'#3498db',
+      content:`<div style="font-size:20px;font-weight:700;margin:8px 0">${data.lunar.display}</div>
+        <div class="desc">${data.lunar.desc}</div>
+        <div class="tags"><span class="tag ${data.lunar.is_lucky_day?'green':'gold'}">${data.lunar.is_lucky_day?'吉日':'平日'}</span></div>`},
+    { icon:'🧭', title:'风水数理', color:'#27ae60',
+      content:`<div class="desc">${data.fengshui.desc}</div>
+        <div style="margin-top:8px"><div style="font-size:12px;color:var(--text-light)">大吉号码:</div>
+        <div class="ball-row" style="margin-top:4px">${data.fengshui.great_lucky.map(n=>ballHtml(n,'green','sm')).join('')}</div></div>
+        <div style="margin-top:8px"><div style="font-size:12px;color:var(--text-light)">建议避免:</div>
+        <div class="ball-row" style="margin-top:4px">${data.fengshui.avoid.map(n=>ballHtml(n,'red','sm')).join('')}</div></div>`},
+  ];
+
+  let html = `<div class="data-date">数据日期: ${data.date}</div>`;
+  modules.forEach(m => {
+    html += `<div class="xuan-card" style="border-left-color:${m.color}">
+      <span class="icon-big">${m.icon}</span><div class="title">${m.title}</div>${m.content}</div>`;
+  });
+  document.getElementById('xuanxueResult').innerHTML = html;
+}
+
+// ===== 玄学回退计算 =====
+function computeXuanxue() {
+  const d = new Date();
+  const base = new Date(2000, 0, 7);
+  const days = Math.floor((d - base) / 86400000);
+  const TG = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+  const DZ = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+  const TG_WX = ['木','木','火','火','土','土','金','金','水','水'];
+  const WX_DESC = {木:'木主仁，宜选尾数3、8',火:'火主礼，宜选尾数2、7',土:'土主信，宜选尾数5、0',金:'金主义，宜选尾数4、9',水:'水主智，宜选尾数1、6'};
+  const WX_NUMS = {木:[3,8],火:[2,7],土:[5,0],金:[4,9],水:[1,6]};
+  const SHENG = {木:'火',火:'土',土:'金',金:'水',水:'木'};
+  const KE = {木:'土',土:'水',水:'火',火:'金',金:'木'};
+  const animals = ['鼠','牛','虎','兔','龙','蛇','马','羊','猴','鸡','狗','猪'];
+  const tg = TG[((days%10)+10)%10], dz = DZ[((days%12)+12)%12];
+  const wx = TG_WX[((days%10)+10)%10];
+  const animal = animals[(d.getFullYear()-4)%12];
+  return {
+    date: d.toISOString().slice(0,10),
+    wuxing: {ganzhi:tg+dz, element:wx, desc:WX_DESC[wx], lucky_tails:WX_NUMS[wx], sheng_tails:WX_NUMS[SHENG[wx]], avoid_tails:WX_NUMS[KE[wx]]},
+    shengxiao: {year:d.getFullYear(), animal, lucky_numbers:[2,3,7], liuhe:'羊', sanhe:['虎','狗'], chong:'鼠', desc:`${d.getFullYear()}年为${animal}年`},
+    bagua: {name:'今日卦象', upper_desc:'上卦', lower_desc:'下卦', lucky_numbers:[1,6,8,9,16,18], yao:3, desc:'今日卦象'},
+    lunar: {display:'农历日期', is_lucky_day:false, desc:'宜稳健选号'},
+    fengshui: {great_lucky:[3,6,8,9,13,16,18,19,23,26], lucky:[1,2,5,7], avoid:[4,14,24,34], desc:'风水以8(发)6(顺)9(久)为大吉'}
+  };
+}
+
+// ===== 开奖记录 =====
+async function loadHistory() {
+  const code = getSelected('histSelector', 'type') || 'ssq';
+  const container = document.getElementById('historyResult');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  const data = await loadJSON(code);
+  if (!data) { container.innerHTML = ''; return; }
+
+  let html = `<div class="card"><div class="card-title">📋 ${data.name} 最近开奖 (共${data.total}期)</div>`;
+  data.history.forEach(d => {
+    html += `<div class="history-item"><div class="history-meta"><span>第 ${d.period} 期</span><span>${d.date}</span></div>
+      ${renderBalls(code, d.main, d.bonus)}</div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ===== 关于页 =====
+async function loadAbout() {
+  const info = document.getElementById('dataInfo');
+  let html = '<div class="card-title">📡 数据状态</div>';
+  for (const code of ['ssq','dlt','qxc','kl8']) {
+    const d = await loadJSON(code);
+    if (d) {
+      html += `<div class="pattern-row"><span class="pattern-label">${d.name}</span>
+        <span style="font-size:12px"><span style="color:var(--green)">${d.total} 期</span></span></div>`;
+    }
+  }
+  info.innerHTML = html;
+}
+</script>
+</body>
+</html>
